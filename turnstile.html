@@ -30,7 +30,7 @@
             background-color: #fff;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            width: 350px;
+            width: 320px;
             overflow: hidden;
             animation: fadeIn 0.3s ease;
         }
@@ -167,7 +167,8 @@
         </div>
         <div class="turnstile-body">
             <p class="turnstile-message">请确认您不是机器人</p>
-            <input type="text" class="turnstile-input" id="humanInput" placeholder="输入“我不是机器人”以验证" />
+            <h2 class="turnstile-message" style="font-weight: 900;">现在请你轻晃鼠标<br>或<br>多次在不同位置点击屏幕</h2>
+            <input type="text" class="turnstile-input" id="humanInput" placeholder="输入“我不是机器人”以验证"/>
             <button class="turnstile-button" id="verifyButton">验证</button>
             <div class="turnstile-loading" id="loadingIndicator"></div>
             <p class="turnstile-success" id="successMessage">验证成功！正在加载内容...</p>
@@ -202,7 +203,7 @@
                 this.monitorNetworkRequests();
 
                 // 尝试无感验证
-                setTimeout(() => this.tryPassiveVerification(), 5000);
+                setTimeout(() => this.tryPassiveVerification(), 10000);
             }
 
             initElements() {
