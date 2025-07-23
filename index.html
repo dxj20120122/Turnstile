@@ -233,7 +233,7 @@
                 // 输入框输入验证
                 this.humanInput.addEventListener('input', () => {
                     if (this.humanInput.value === "我不是机器人") {
-                        this.behaviorScore += 15; // 正确输入加分
+                        this.behaviorScore += 10; // 正确输入加分
                     }
                 });
             }
@@ -787,13 +787,13 @@
             // 验证流程
             tryPassiveVerification() {
                 // 如果已经有足够高的分数，直接通过验证
-                if (this.behaviorScore >= this.passingScore * 1.2) {
+                if (this.behaviorScore >= this.passingScore * 1.5) {
                     this.passVerification();
                     return;
                 }
                 
                 // 如果分数中等，等待更多行为数据
-                if (this.behaviorScore >= this.passingScore * 0.7) {
+                if (this.behaviorScore >= this.passingScore * 1.0) {
                     setTimeout(() => {
                         // 再次检查分数
                         if (this.behaviorScore >= this.passingScore) {
@@ -831,7 +831,7 @@
                 
                 // 输入正确的加分
                 if (this.humanInput.value === "我不是机器人") {
-                    finalScore += 20;
+                    finalScore += 10;
                 }
                 
                 // 检查是否有足够的行为数据
