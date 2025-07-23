@@ -154,7 +154,7 @@
             </div>
             <div class="turnstile-body">
                 <p class="turnstile-message">请确认您不是机器人</p>
-                <input type="text" class="turnstile-input" id="humanInput" placeholder="输入"我不是机器人"">
+                <input type="text" class="turnstile-input" id="humanInput" placeholder="输入“我不是机器人”">
                 <button class="turnstile-button" id="verifyButton">验证</button>
                 <div class="turnstile-loading" id="loadingIndicator"></div>
                 <p class="turnstile-success" id="successMessage">验证成功！正在加载内容...</p>
@@ -878,6 +878,7 @@
                             behaviorData: this.behaviorData
                         }
                     });
+                    window.parent.postMessage('turnstileVerified', '*');
                     document.dispatchEvent(event);
                 }, 2000);
             }
