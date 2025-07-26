@@ -15,7 +15,7 @@
     overlay.style.left = '0';
     overlay.style.width = '100%';
     overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+    overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.99)';
     overlay.style.zIndex = '9998';
     overlay.style.display = 'none';
     document.body.appendChild(overlay);

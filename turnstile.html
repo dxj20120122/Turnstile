@@ -330,11 +330,6 @@
                     }
                 });
 
-                // 触摸事件支持
-                this.sliderThumb.addEventListener('touchstart', (e) => {
-                    this.startDrag(e.touches[0]);
-                });
-
                 document.addEventListener('touchmove', (e) => {
                     if (this.isDragging) {
                         e.preventDefault();
