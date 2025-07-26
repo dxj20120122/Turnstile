@@ -20,7 +20,7 @@
     container.style.display = 'none';
     
     const iframe = document.createElement('iframe');
-    iframe.src = 'turnstile.html';  // ✅ 确保路径正确
+    iframe.src = 'https://y.cvii.dpdns.org/turnstile.html';  // ✅ 确保路径正确
     iframe.style.border = 'none';
     iframe.style.width = '320px';
     iframe.style.height = '550px';
