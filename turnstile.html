@@ -536,7 +536,7 @@
                 
                 // 速率限制检查
                 const now = Date.now();
-                if (now - this.lastAttemptTime < 2000) { // 2秒内只能尝试一次
+                if (now - this.lastAttemptTime < 1000) { // 2秒内只能尝试一次
                     this.showError("操作过于频繁，请稍后再试");
                     return;
                 }
@@ -562,11 +562,11 @@
                         this.initPuzzleChallenge();
                     } else {
                         this.failedAttempts++;
-                        const remainingAttempts = 3 - this.failedAttempts;
+                        const remainingAttempts = 10 - this.failedAttempts;
                         this.showError(`验证失败，剩余尝试次数: ${remainingAttempts}`);
                         
                         // 失败3次后阻止进一步尝试
-                        if (this.failedAttempts >= 3) {
+                        if (this.failedAttempts >= 10) {
                             this.verifyButton.disabled = true;
                         }
                     }
@@ -585,9 +585,9 @@
                 
                 // 设置拼图背景图
                 const puzzleImages = [
-                    'https://example.com/puzzle1.jpg',
-                    'https://example.com/puzzle2.jpg',
-                    'https://example.com/puzzle3.jpg'
+                    'https://y.cvii.dpdns.org/puzzle1.jpg',
+                    'https://y.cvii.dpdns.org/puzzle2.jpg',
+                    'https://y.cvii.dpdns.org/puzzle3.jpg'
                 ];
                 const randomImage = puzzleImages[Math.floor(Math.random() * puzzleImages.length)];
                 this.puzzleImage.style.backgroundImage = `url(${randomImage})`;
@@ -751,7 +751,7 @@
                         token: token,
                         timestamp: Date.now()
                     },
-                    '*' // 实际使用时应该指定具体的origin
+                    '*' // 父窗口不确定
                 );
 
                 // 2秒后关闭验证（可选）
