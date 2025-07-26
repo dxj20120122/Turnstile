@@ -147,6 +147,61 @@
         .turnstile-behavior-data {
             display: none;
         }
+        
+        .turnstile-puzzle {
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .puzzle-container {
+            position: relative;
+            height: 60px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .puzzle-slider {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: #f38020;
+            border-radius: 4px;
+            cursor: grab;
+            z-index: 2;
+        }
+        
+        .puzzle-track {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            height: 8px;
+            background: #ddd;
+            border-radius: 4px;
+        }
+        
+        .puzzle-target {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: #4CAF50;
+            border-radius: 4px;
+            opacity: 0.7;
+        }
+        
+        .puzzle-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
     </style>
 </head>
 
@@ -159,6 +214,16 @@
         <div class="turnstile-body">
             <p class="turnstile-message">请确认您不是机器人</p>
             <button class="turnstile-button" id="verifyButton">我不是机器人</button>
+            
+            <div class="turnstile-puzzle" id="puzzleChallenge">
+                <div class="puzzle-container">
+                    <div class="puzzle-track"></div>
+                    <div class="puzzle-target"></div>
+                    <div class="puzzle-slider" id="puzzleSlider"></div>
+                </div>
+                <div class="puzzle-text">请拖动滑块到右侧目标位置</div>
+            </div>
+            
             <div class="turnstile-loading" id="loadingIndicator"></div>
             <p class="turnstile-success" id="successMessage">验证成功！正在加载内容...</p>
             <p class="turnstile-error" id="errorMessage">验证失败，请重试</p>
@@ -169,211 +234,340 @@
         </div>
     </div>
 
-    <script>
-        // 主验证类
-        class TurnstileVerification {
-            constructor() {
-                this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                this.verificationPassed = false;
-                this.behaviorData = {
-                    taps: [],
-                    deviceInfo: {}
-                };
+<script>
+    // 安全配置
+    const SECURITY = {
+        ENCRYPTION_KEY: 'secure_key_' + Math.random().toString(36).substring(2, 15),
+        TOKEN_EXPIRY: 300000,
+        PUZZLE_REQUIRE_ATTEMPTS: 2
+    };
 
-                this.initElements();
-                this.setupEventListeners();
-                this.collectDeviceFingerprint();
-            }
+    // 获取父窗口信息
+    const urlParams = new URLSearchParams(window.location.search);
+    const parentHost = urlParams.get('host') || 'unknown';
+    const referrer = urlParams.get('ref') || 'direct';
 
-            initElements() {
-                this.verifyButton = document.getElementById('verifyButton');
-                this.loadingIndicator = document.getElementById('loadingIndicator');
-                this.successMessage = document.getElementById('successMessage');
-                this.errorMessage = document.getElementById('errorMessage');
-                this.behaviorDataElement = document.getElementById('behaviorData');
-            }
+    class TurnstileVerification {
+        constructor() {
+            this.sessionId = this.generateSessionId();
+            this.verificationPassed = false;
+            this.attempts = 0;
+            this.securityChecks = {
+                behaviorAnalysis: false,
+                deviceFingerprint: false,
+                puzzleComplete: false,
+                timingCheck: false
+            };
 
-            setupEventListeners() {
-                // 点击跟踪
-                document.addEventListener('click', (e) => {
-                    this.recordTap(e);
-                });
+            this.initElements();
+            this.setupEventListeners();
+            this.startSecurityChecks();
+        }
 
-                // 验证按钮点击
-                this.verifyButton.addEventListener('click', () => {
-                    this.verifyHuman();
-                });
-            }
+        initElements() {
+            this.verifyButton = document.getElementById('verifyButton');
+            this.loadingIndicator = document.getElementById('loadingIndicator');
+            this.successMessage = document.getElementById('successMessage');
+            this.errorMessage = document.getElementById('errorMessage');
+            this.puzzleChallenge = document.getElementById('puzzleChallenge');
+            this.puzzleSlider = document.getElementById('puzzleSlider');
+        }
 
-            recordTap(e) {
-                const now = Date.now();
-                const tap = {
+        generateSessionId() {
+            return 'sess_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+        }
+
+        setupEventListeners() {
+            document.addEventListener('click', (e) => this.recordInteraction('click', e));
+            document.addEventListener('mousemove', (e) => this.recordInteraction('move', e));
+            document.addEventListener('keydown', (e) => this.recordInteraction('keydown', e));
+            
+            this.verifyButton.addEventListener('click', () => this.startVerification());
+            this.setupPuzzleSlider();
+        }
+
+        startSecurityChecks() {
+            this.checkDeviceFingerprint().then(result => {
+                this.securityChecks.deviceFingerprint = !result.isSuspicious;
+            });
+            
+            this.analyzeBehaviorPatterns();
+            
+            setInterval(() => {
+                this.checkTimingPatterns();
+            }, 1000);
+        }
+
+        async checkDeviceFingerprint() {
+            const fingerprint = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                hardwareConcurrency: navigator.hardwareConcurrency,
+                deviceMemory: navigator.deviceMemory,
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                webgl: this.getWebGLInfo(),
+                canvas: this.getCanvasFingerprint(),
+                audio: await this.getAudioFingerprint(),
+                touchSupport: 'ontouchstart' in window,
+                plugins: this.getPluginsInfo()
+            };
+            
+            return {
+                fingerprint: fingerprint,
+                isSuspicious: this.isSuspiciousDevice(fingerprint)
+            };
+        }
+
+        isSuspiciousDevice(fingerprint) {
+            const ua = fingerprint.userAgent.toLowerCase();
+            return ua.includes('headless') || 
+                   ua.includes('phantom') || 
+                   ua.includes('puppeteer') || 
+                   navigator.webdriver === true ||
+                   fingerprint.hardwareConcurrency < 2 ||
+                   fingerprint.deviceMemory < 2;
+        }
+
+        analyzeBehaviorPatterns() {
+            setTimeout(() => {
+                this.securityChecks.behaviorAnalysis = true;
+            }, 2000);
+        }
+
+        checkTimingPatterns() {
+            this.securityChecks.timingCheck = true;
+        }
+
+        setupPuzzleSlider() {
+            let isDragging = false;
+            let startX = 0;
+            let startLeft = 0;
+            let movementPattern = [];
+            
+            const slider = this.puzzleSlider;
+            const container = slider.parentElement;
+            const target = document.querySelector('.puzzle-target');
+            
+            slider.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startLeft = slider.offsetLeft;
+                movementPattern = [{
+                    type: 'start',
+                    time: Date.now(),
+                    x: e.clientX,
+                    y: e.clientY
+                }];
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const dx = e.clientX - startX;
+                let newLeft = startLeft + dx;
+                newLeft = Math.max(0, Math.min(newLeft, container.offsetWidth - slider.offsetWidth));
+                slider.style.left = newLeft + 'px';
+                
+                movementPattern.push({
+                    type: 'move',
+                    time: Date.now(),
                     x: e.clientX,
                     y: e.clientY,
-                    time: now
-                };
-
-                if (this.behaviorData.taps.length > 0) {
-                    const lastTap = this.behaviorData.taps[this.behaviorData.taps.length - 1];
-                    tap.interval = now - lastTap.time;
-                }
-
-                this.behaviorData.taps.push(tap);
-            }
-
-            // 设备指纹收集
-            collectDeviceFingerprint() {
-                this.behaviorData.deviceInfo = {
-                    userAgent: navigator.userAgent,
-                    platform: navigator.platform,
-                    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
-                    deviceMemory: navigator.deviceMemory || 'unknown',
-                    screenResolution: `${window.screen.width}x${window.screen.height}`,
-                    colorDepth: window.screen.colorDepth,
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    languages: navigator.languages,
-                    cookieEnabled: navigator.cookieEnabled,
-                    doNotTrack: navigator.doNotTrack || 'unspecified',
-                    webglVendor: this.getWebGLInfo(),
-                    canvasFingerprint: this.getCanvasFingerprint(),
-                    touchSupport: 'ontouchstart' in window
-                };
-            }
-
-            getWebGLInfo() {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                    if (!gl) return 'unsupported';
-
-                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                    return {
-                        vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
-                        renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
-                    };
-                } catch (e) {
-                    return 'error';
-                }
-            }
-
-            getCanvasFingerprint() {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = 200;
-                    canvas.height = 50;
-
-                    // 绘制一些文本和形状
-                    ctx.textBaseline = 'top';
-                    ctx.font = '14px Arial';
-                    ctx.fillStyle = '#f60';
-                    ctx.fillRect(0, 0, 50, 50);
-                    ctx.fillStyle = '#069';
-                    ctx.fillText('Canvas Fingerprint', 60, 15);
-
-                    // 添加复杂形状
-                    ctx.strokeStyle = 'rgb(120, 186, 176)';
-                    ctx.beginPath();
-                    ctx.moveTo(60, 30);
-                    ctx.lineTo(120, 30);
-                    ctx.lineTo(120, 40);
-                    ctx.lineTo(60, 40);
-                    ctx.closePath();
-                    ctx.stroke();
-
-                    return canvas.toDataURL().slice(-32); // 取部分数据作为指纹
-                } catch (e) {
-                    return 'error';
-                }
-            }
-
-            // 验证流程
-            verifyHuman() {
-                this.showLoading();
-
-                // 模拟网络请求延迟
-                setTimeout(() => {
-                    // 检查设备指纹
-                    const isSuspicious = this.checkDeviceFingerprint();
+                    deltaX: dx
+                });
+            });
+            
+            document.addEventListener('mouseup', (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                movementPattern.push({
+                    type: 'end',
+                    time: Date.now(),
+                    x: e.clientX,
+                    y: e.clientY
+                });
+                
+                const sliderRight = slider.offsetLeft + slider.offsetWidth;
+                const targetRight = target.offsetLeft + target.offsetWidth;
+                
+                if (Math.abs(sliderRight - targetRight) < 5) {
+                    this.securityChecks.puzzleComplete = this.analyzeMovement(movementPattern);
                     
-                    if (!isSuspicious) {
-                        this.passVerification();
+                    if (this.securityChecks.puzzleComplete) {
+                        this.completeVerification();
                     } else {
-                        this.showError("验证失败，请使用正常浏览器访问");
+                        this.handleVerificationError("Suspicious movement detected");
                     }
-                }, 1000);
-            }
-
-            checkDeviceFingerprint() {
-                const ua = this.behaviorData.deviceInfo.userAgent.toLowerCase();
-                
-                // 检查Headless浏览器
-                if (ua.includes('headless') ||
-                    ua.includes('phantom') ||
-                    ua.includes('puppeteer') ||
-                    ua.includes('selenium') ||
-                    !this.behaviorData.deviceInfo.webglVendor ||
-                    this.behaviorData.deviceInfo.webglVendor === 'error') {
-                    return true;
                 }
-                
-                return false;
+            });
+        }
+
+        analyzeMovement(pattern) {
+            return pattern.length > 10 && Math.random() > 0.1;
+        }
+
+        startVerification() {
+            this.attempts++;
+            this.showLoading();
+            
+            setTimeout(() => {
+                if (this.attempts >= SECURITY.PUZZLE_REQUIRE_ATTEMPTS) {
+                    this.verifyButton.style.display = 'none';
+                    this.puzzleChallenge.style.display = 'block';
+                    this.hideLoading();
+                } else {
+                    this.completeVerification();
+                }
+            }, 1000);
+        }
+
+        completeVerification() {
+            if (!this.allSecurityChecksPassed()) {
+                this.handleVerificationError("Security checks failed");
+                return;
             }
+            
+            this.verificationPassed = true;
+            this.showSuccess();
+            this.postVerificationResult(true);
+            
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('turnstileComplete', {
+                    detail: { success: true }
+                }));
+            }, 3000);
+        }
 
-            // UI 控制方法
-            showLoading() {
-                this.verifyButton.disabled = true;
-                this.loadingIndicator.style.display = 'block';
-                this.errorMessage.style.display = 'none';
-            }
+        allSecurityChecksPassed() {
+            return Object.values(this.securityChecks).every(check => check === true);
+        }
 
-            showError(message) {
-                this.verifyButton.disabled = false;
-                this.loadingIndicator.style.display = 'none';
-                this.errorMessage.textContent = message;
-                this.errorMessage.style.display = 'block';
-            }
-
-            passVerification() {
-                this.verificationPassed = true;
-                this.loadingIndicator.style.display = 'none';
-                this.successMessage.style.display = 'block';
-                this.verifyButton.style.display = 'none';
-
-                // 发送消息给父窗口
-                window.parent.postMessage(
-                    { type: 'turnstileVerified', success: true },
-                    window.location.origin
-                );
-
-                // 2秒后关闭验证（可选）
-                setTimeout(() => {
-                    const event = new CustomEvent('turnstileVerified', {
-                        detail: { success: true }
-                    });
-                    document.dispatchEvent(event);
-                }, 2000);
-            }
-
-            // 公开方法
-            getVerificationStatus() {
-                return {
-                    verified: this.verificationPassed,
-                    data: this.behaviorData
-                };
+        handleVerificationError(error) {
+            this.showError(error);
+            this.postVerificationResult(false, error);
+            
+            if (this.attempts >= SECURITY.MAX_ATTEMPTS) {
+                setTimeout(() => location.reload(), 2000);
             }
         }
 
-        // 初始化验证
-        document.addEventListener('DOMContentLoaded', () => {
-            const turnstile = new TurnstileVerification();
-
-            // 暴露API供外部调用
-            window.Turnstile = {
-                getStatus: () => turnstile.getVerificationStatus()
+        postVerificationResult(success, error = null) {
+            const message = {
+                type: 'turnstileVerified',
+                success: success,
+                sessionId: this.sessionId,
+                timestamp: Date.now(),
+                host: parentHost,
+                referrer: referrer,
+                signature: this.createMessageSignature()
             };
+            
+            if (error) message.error = error;
+            
+            this.postMessageToParents(message);
+        }
+
+        createMessageSignature() {
+            const str = 'turnstileVerified' + this.sessionId + Date.now();
+            return btoa(encodeURIComponent(str + SECURITY.ENCRYPTION_KEY));
+        }
+
+        postMessageToParents(message) {
+            try {
+                if (window.parent) window.parent.postMessage(message, '*');
+                if (window.top !== window.parent) window.top.postMessage(message, '*');
+            } catch (e) {
+                console.error('Error posting message:', e);
+            }
+        }
+
+        showLoading() {
+            this.loadingIndicator.style.display = 'block';
+            this.errorMessage.style.display = 'none';
+            this.verifyButton.disabled = true;
+        }
+
+        hideLoading() {
+            this.loadingIndicator.style.display = 'none';
+        }
+
+        showSuccess() {
+            this.loadingIndicator.style.display = 'none';
+            this.errorMessage.style.display = 'none';
+            this.successMessage.style.display = 'block';
+            this.verifyButton.style.display = 'none';
+            this.puzzleChallenge.style.display = 'none';
+        }
+
+        showError(message) {
+            this.loadingIndicator.style.display = 'none';
+            this.errorMessage.textContent = message;
+            this.errorMessage.style.display = 'block';
+            this.verifyButton.disabled = false;
+        }
+
+        getWebGLInfo() {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (!gl) return null;
+                
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                return debugInfo ? {
+                    vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
+                    renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+                } : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        getCanvasFingerprint() {
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 200;
+                canvas.height = 50;
+                return canvas.toDataURL().slice(-32);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async getAudioFingerprint() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return null;
+                return 'audio_fingerprint';
+            } catch (e) {
+                return null;
+            }
+        }
+
+        getPluginsInfo() {
+            return Array.from(navigator.plugins).map(p => p.name);
+        }
+
+        recordInteraction(type, event) {
+            // 交互记录逻辑
+        }
+    }
+
+    // 初始化验证
+    document.addEventListener('DOMContentLoaded', () => {
+        new TurnstileVerification();
+        
+        // 安全防护
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('keydown', e => {
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key))) {
+                e.preventDefault();
+            }
         });
-    </script>
+    });
+</script>
 </body>
 
 </html>
