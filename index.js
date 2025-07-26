@@ -2,9 +2,9 @@
     // 配置
     const config = {
         allowedOrigins: [
-            'https://y.cvii.dpdns.org' //仅有此合法域名可以发送验证结果
+            window.location.origin // 允许当前域作为合法域名
         ],
-        iframeSrc: 'https://y.cvii.dpdns.org/turnstile.html',
+        iframeSrc: './turnstile.html', // 使用相对路径
         verificationTimeout: 300000 // 5分钟验证超时
     };
     

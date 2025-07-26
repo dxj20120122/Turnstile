@@ -40,6 +40,7 @@
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -134,8 +135,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .turnstile-behavior-data {
@@ -234,7 +240,7 @@
         <div class="turnstile-body">
             <p class="turnstile-message" id="verificationMessage">请确认您不是机器人</p>
             <button class="turnstile-button" id="verifyButton">开始验证</button>
-            
+
             <div id="puzzleChallenge" style="display: none;">
                 <div class="puzzle-container">
                     <div class="puzzle-image" id="puzzleImage"></div>
@@ -247,7 +253,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="turnstile-loading" id="loadingIndicator"></div>
             <p class="turnstile-success" id="successMessage">验证成功！正在加载内容...</p>
             <p class="turnstile-error" id="errorMessage">验证失败，请重试</p>
@@ -276,7 +282,7 @@
                 this.initElements();
                 this.setupEventListeners();
                 this.collectDeviceFingerprint();
-                
+
                 // 拼图验证相关
                 this.puzzleTargetPosition = 0;
                 this.isDragging = false;
@@ -369,7 +375,7 @@
 
             recordMovement(e) {
                 if (this.behaviorData.movements.length > 100) return; // 限制数据量
-                
+
                 const now = Date.now();
                 this.behaviorData.movements.push({
                     x: e.clientX,
@@ -404,7 +410,7 @@
                     touchSupport: 'ontouchstart' in window,
                     // 性能指标
                     performanceTiming: window.performance ? {
-                        timing: window.performance.timing ? 
+                        timing: window.performance.timing ?
                             Object.assign({}, window.performance.timing) : null,
                         memory: window.performance.memory
                     } : null
@@ -480,22 +486,22 @@
                     const oscillator = audioContext.createOscillator();
                     const analyser = audioContext.createAnalyser();
                     const gainNode = audioContext.createGain();
-                    
+
                     oscillator.connect(analyser);
                     analyser.connect(gainNode);
                     gainNode.connect(audioContext.destination);
-                    
+
                     oscillator.type = 'triangle';
                     oscillator.frequency.value = 10000;
                     gainNode.gain.value = 0;
-                    
+
                     oscillator.start();
                     const data = new Uint8Array(analyser.frequencyBinCount);
                     analyser.getByteFrequencyData(data);
                     oscillator.stop();
-                    
+
                     return Array.from(data).join(',');
-                } catch(e) {
+                } catch (e) {
                     return 'error';
                 }
             }
@@ -506,26 +512,26 @@
                     'Comic Sans MS', 'Georgia', 'Impact', 'Tahoma',
                     'Trebuchet MS', 'Verdana', '微软雅黑', '宋体'
                 ];
-                
+
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 canvas.width = 300;
                 canvas.height = 150;
-                
+
                 const availableFonts = [];
                 const baseString = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                
+
                 fonts.forEach(font => {
                     ctx.font = '72px ' + font + ', monospace';
                     const text1 = ctx.measureText(baseString).width;
                     ctx.font = '72px monospace';
                     const text2 = ctx.measureText(baseString).width;
-                    
+
                     if (text1 !== text2) {
                         availableFonts.push(font);
                     }
                 });
-                
+
                 return availableFonts;
             }
 
@@ -533,30 +539,30 @@
             startVerification() {
                 // 记录交互开始时间
                 this.behaviorData.interactionTiming.start = Date.now();
-                
+
                 // 速率限制检查
                 const now = Date.now();
                 if (now - this.lastAttemptTime < 1000) { // 2秒内只能尝试一次
                     this.showError("操作过于频繁，请稍后再试");
                     return;
                 }
-                
+
                 // 失败次数限制
                 if (this.failedAttempts >= 3) {
                     this.showError("验证失败次数过多，请刷新页面重试");
                     this.verifyButton.disabled = true;
                     return;
                 }
-                
+
                 this.lastAttemptTime = now;
                 this.showLoading();
-                
+
                 // 根据失败次数增加延迟
                 const delay = 1000 + (this.failedAttempts * 500);
-                
+
                 setTimeout(() => {
                     const isSuspicious = this.checkDeviceFingerprint();
-                    
+
                     if (!isSuspicious) {
                         // 初级验证通过，显示拼图验证
                         this.initPuzzleChallenge();
@@ -564,7 +570,7 @@
                         this.failedAttempts++;
                         const remainingAttempts = 10 - this.failedAttempts;
                         this.showError(`验证失败，剩余尝试次数: ${remainingAttempts}`);
-                        
+
                         // 失败3次后阻止进一步尝试
                         if (this.failedAttempts >= 10) {
                             this.verifyButton.disabled = true;
@@ -572,69 +578,70 @@
                     }
                 }, delay);
             }
-            
-            // 初始化拼图验证
+
+            // 修改拼图图片路径部分
             initPuzzleChallenge() {
                 this.loadingIndicator.style.display = 'none';
                 this.verifyButton.style.display = 'none';
                 this.puzzleChallenge.style.display = 'block';
                 this.verificationMessage.textContent = '请完成拼图验证';
-                
+
                 // 设置随机拼图位置 (60%-90% 范围内)
                 this.puzzleTargetPosition = Math.floor(Math.random() * 30) + 60;
-                
-                // 设置拼图背景图
+
+                // 设置拼图背景图 - 修改为相对路径
                 const puzzleImages = [
-                    'https://y.cvii.dpdns.org/puzzle1.jpg',
-                    'https://y.cvii.dpdns.org/puzzle2.jpg',
-                    'https://y.cvii.dpdns.org/puzzle3.jpg'
+                    './puzzle1.jpg',
+                    './puzzle2.jpg',
+                    './puzzle3.jpg'
                 ];
                 const randomImage = puzzleImages[Math.floor(Math.random() * puzzleImages.length)];
                 this.puzzleImage.style.backgroundImage = `url(${randomImage})`;
-                
+
                 // 初始化滑块位置
                 const sliderTrack = this.sliderThumb.parentElement;
                 const trackRect = sliderTrack.getBoundingClientRect();
                 this.sliderLeft = trackRect.left;
-                
+
                 // 重置拼图块位置
                 this.puzzlePiece.style.left = `${this.puzzleTargetPosition}%`;
             }
-            
+
+
             // 开始拖动滑块
             startDrag(e) {
                 this.isDragging = true;
                 this.startX = e.clientX - this.sliderThumb.getBoundingClientRect().left;
                 this.sliderThumb.style.cursor = 'grabbing';
             }
-            
+
             // 拖动滑块
             dragSlider(e) {
                 if (!this.isDragging) return;
-                
+
                 const sliderTrack = this.sliderThumb.parentElement;
                 const trackWidth = sliderTrack.offsetWidth - this.sliderThumb.offsetWidth;
                 let newLeft = e.clientX - this.sliderLeft - this.startX;
-                
+
                 // 限制滑块范围
                 newLeft = Math.max(0, Math.min(newLeft, trackWidth));
-                
+
                 // 更新滑块位置
                 this.sliderThumb.style.left = `${newLeft}px`;
-                
+
                 // 检查是否验证成功 (允许±5px误差)
                 const thumbPosition = (newLeft / trackWidth) * 100;
                 if (Math.abs(thumbPosition - this.puzzleTargetPosition) < 5) {
                     this.puzzleSuccess.style.display = 'flex';
                     this.sliderThumb.style.backgroundColor = '#4CAF50';
-                    
+
                     // 延迟一点时间让用户看到成功效果
                     setTimeout(() => {
                         this.passVerification();
                     }, 500);
                 }
             }
-            
+
             // 结束拖动
             endDrag() {
                 this.isDragging = false;
@@ -647,68 +654,68 @@
             checkDeviceFingerprint() {
                 const ua = this.behaviorData.deviceInfo.userAgent.toLowerCase();
                 const perf = window.performance;
-                
+
                 // 1. 检查Headless浏览器
                 const headlessIndicators = [
                     'headless', 'phantom', 'puppeteer', 'selenium',
                     'crawler', 'spider', 'bot', 'automation'
                 ];
-                
+
                 if (headlessIndicators.some(ind => ua.includes(ind))) {
                     return true;
                 }
-                
+
                 // 2. 检查WebGL支持
-                if (!this.behaviorData.deviceInfo.webglVendor || 
+                if (!this.behaviorData.deviceInfo.webglVendor ||
                     this.behaviorData.deviceInfo.webglVendor === 'error' ||
                     this.behaviorData.deviceInfo.webglVendor === 'no_debug_info') {
                     return true;
                 }
-                
+
                 // 3. 检查屏幕尺寸异常
                 if (window.screen.width < 200 || window.screen.height < 200) {
                     return true;
                 }
-                
+
                 // 4. 检查插件数量异常
                 if (navigator.plugins.length === 0 && !this.isMobile) {
                     return true;
                 }
-                
+
                 // 5. 检查时区异常
                 const timezone = this.behaviorData.deviceInfo.timezone;
                 if (!timezone || timezone === 'Etc/UTC' || timezone === 'UTC') {
                     return true;
                 }
-                
+
                 // 6. 检查CPU核心数异常
                 const cores = this.behaviorData.deviceInfo.hardwareConcurrency;
                 if (cores === 1 || cores > 16) {
                     return true;
                 }
-                
+
                 // 7. 检查内存异常
                 const memory = this.behaviorData.deviceInfo.deviceMemory;
                 if (memory < 1 || memory > 16) {
                     return true;
                 }
-                
+
                 // 8. 检查触摸支持与设备类型是否匹配
                 const hasTouch = this.behaviorData.deviceInfo.touchSupport;
                 if (this.isMobile && !hasTouch) {
                     return true;
                 }
-                
+
                 // 9. 检查行为模式
                 if (this.behaviorData.taps.length < 3) {
                     return true;
                 }
-                
+
                 // 10. 检查字体指纹
                 if (this.behaviorData.deviceInfo.fontFingerprint.length < 5) {
                     return true;
                 }
-                
+
                 return false;
             }
 
@@ -731,9 +738,9 @@
             passVerification() {
                 // 记录交互结束时间
                 this.behaviorData.interactionTiming.end = Date.now();
-                this.behaviorData.interactionTiming.duration = 
+                this.behaviorData.interactionTiming.duration =
                     this.behaviorData.interactionTiming.end - this.behaviorData.interactionTiming.start;
-                
+
                 this.verificationPassed = true;
                 this.loadingIndicator.style.display = 'none';
                 this.successMessage.style.display = 'block';
@@ -742,11 +749,11 @@
 
                 // 生成验证token
                 const token = this.generateVerificationToken();
-                
+
                 // 发送消息给父窗口
                 window.parent.postMessage(
-                    { 
-                        type: 'turnstileVerified', 
+                    {
+                        type: 'turnstileVerified',
                         success: true,
                         token: token,
                         timestamp: Date.now()
@@ -762,17 +769,17 @@
                     document.dispatchEvent(event);
                 }, 2000);
             }
-            
+
             // 生成验证token
             generateVerificationToken() {
                 // 简单示例 - 实际应用中应该使用更安全的算法
                 const timestamp = Date.now();
                 const randomStr = Math.random().toString(36).substring(2, 15);
                 const fingerprintHash = this.hashString(JSON.stringify(this.behaviorData.deviceInfo));
-                
+
                 return `${timestamp}-${randomStr}-${fingerprintHash.slice(0, 8)}`;
             }
-            
+
             // 简单的字符串哈希函数
             hashString(str) {
                 let hash = 0;
