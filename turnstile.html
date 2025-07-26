@@ -142,85 +142,71 @@
             display: none;
         }
 
-        /* 拼图验证样式 */
-        .puzzle-container {
+        /* 新型验证挑战样式 */
+        .challenge-container {
             margin: 20px 0;
             position: relative;
+            display: none;
         }
 
-        .puzzle-image {
-            width: 100%;
-            height: 150px;
+        .challenge-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .challenge-item {
+            aspect-ratio: 1;
             background-size: cover;
             background-position: center;
             border-radius: 4px;
+            cursor: pointer;
             position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .challenge-item:hover {
+            transform: scale(1.03);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .challenge-item.selected {
+            border-color: #f38020;
+            box-shadow: 0 0 0 3px rgba(243, 128, 32, 0.3);
+        }
+
+        .challenge-item.correct {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.3);
+        }
+
+        .challenge-item.incorrect {
+            border-color: #f44336;
+            box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
+        }
+
+        .challenge-instruction {
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .challenge-progress {
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 15px;
             overflow: hidden;
         }
 
-        .puzzle-slider {
-            width: 100%;
-            height: 40px;
-            background: #f0f0f0;
-            border-radius: 20px;
-            margin-top: 10px;
-            position: relative;
-        }
-
-        .puzzle-slider-track {
+        .challenge-progress-bar {
             height: 100%;
-            background: #e0e0e0;
-            border-radius: 20px;
-            width: calc(100% - 50px);
-            margin: 0 auto;
-            position: relative;
-        }
-
-        .puzzle-slider-thumb {
-            width: 40px;
-            height: 40px;
             background: #f38020;
-            border-radius: 50%;
-            position: absolute;
-            left: 0;
-            top: 0;
-            cursor: grab;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            user-select: none;
-        }
-
-        .puzzle-slider-thumb:active {
-            cursor: grabbing;
-        }
-
-        .puzzle-piece {
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.7);
-            border: 2px dashed #f38020;
-            position: absolute;
-            top: 50%;
-            left: 20px;
-            transform: translateY(-50%);
-            pointer-events: none;
-        }
-
-        .puzzle-success {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(76, 175, 80, 0.7);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
+            width: 0%;
+            transition: width 0.3s;
         }
     </style>
 </head>
@@ -235,16 +221,11 @@
             <p class="turnstile-message" id="verificationMessage">请确认您不是机器人</p>
             <button class="turnstile-button" id="verifyButton">开始验证</button>
             
-            <div id="puzzleChallenge" style="display: none;">
-                <div class="puzzle-container">
-                    <div class="puzzle-image" id="puzzleImage"></div>
-                    <div class="puzzle-slider">
-                        <div class="puzzle-slider-track">
-                            <div class="puzzle-slider-thumb" id="sliderThumb">→</div>
-                            <div class="puzzle-piece" id="puzzlePiece"></div>
-                            <div class="puzzle-success" id="puzzleSuccess">✓</div>
-                        </div>
-                    </div>
+            <div id="challengeContainer" class="challenge-container">
+                <p class="challenge-instruction" id="challengeInstruction">请选择所有包含<span id="challengeTarget">交通灯</span>的图片</p>
+                <div class="challenge-grid" id="challengeGrid"></div>
+                <div class="challenge-progress">
+                    <div class="challenge-progress-bar" id="progressBar"></div>
                 </div>
             </div>
             
@@ -269,18 +250,36 @@
                 this.behaviorData = {
                     taps: [],
                     movements: [],
-                    deviceInfo: {},
+                    deviceInfo: this.collectDeviceInfo(),
                     interactionTiming: {}
                 };
 
+                this.currentChallenge = null;
+                this.selectedItems = [];
+                this.challengeStep = 0;
+                this.maxSteps = 2;
+
                 this.initElements();
                 this.setupEventListeners();
-                
-                // 拼图验证相关
-                this.puzzleTargetPosition = 0;
-                this.isDragging = false;
-                this.startX = 0;
-                this.sliderLeft = 0;
+            }
+
+            collectDeviceInfo() {
+                return {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+                    deviceMemory: navigator.deviceMemory || 'unknown',
+                    touchSupport: 'ontouchstart' in window,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    webglVendor: this.getWebGLVendor(),
+                    screenWidth: window.screen.width,
+                    screenHeight: window.screen.height,
+                    colorDepth: window.screen.colorDepth,
+                    language: navigator.language,
+                    fonts: this.getFontFingerprint(),
+                    canvasFingerprint: this.getCanvasFingerprint(),
+                    audioFingerprint: this.getAudioFingerprint()
+                };
             }
 
             initElements() {
@@ -290,11 +289,11 @@
                 this.errorMessage = document.getElementById('errorMessage');
                 this.verificationMessage = document.getElementById('verificationMessage');
                 this.behaviorDataElement = document.getElementById('behaviorData');
-                this.puzzleChallenge = document.getElementById('puzzleChallenge');
-                this.puzzleImage = document.getElementById('puzzleImage');
-                this.sliderThumb = document.getElementById('sliderThumb');
-                this.puzzlePiece = document.getElementById('puzzlePiece');
-                this.puzzleSuccess = document.getElementById('puzzleSuccess');
+                this.challengeContainer = document.getElementById('challengeContainer');
+                this.challengeGrid = document.getElementById('challengeGrid');
+                this.challengeInstruction = document.getElementById('challengeInstruction');
+                this.challengeTarget = document.getElementById('challengeTarget');
+                this.progressBar = document.getElementById('progressBar');
             }
 
             setupEventListeners() {
@@ -311,36 +310,6 @@
                 // 验证按钮点击
                 this.verifyButton.addEventListener('click', () => {
                     this.startVerification();
-                });
-
-                // 拼图滑块事件
-                this.sliderThumb.addEventListener('mousedown', (e) => {
-                    this.startDrag(e);
-                });
-
-                document.addEventListener('mousemove', (e) => {
-                    if (this.isDragging) {
-                        this.dragSlider(e);
-                    }
-                });
-
-                document.addEventListener('mouseup', () => {
-                    if (this.isDragging) {
-                        this.endDrag();
-                    }
-                });
-
-                document.addEventListener('touchmove', (e) => {
-                    if (this.isDragging) {
-                        e.preventDefault();
-                        this.dragSlider(e.touches[0]);
-                    }
-                });
-
-                document.addEventListener('touchend', () => {
-                    if (this.isDragging) {
-                        this.endDrag();
-                    }
                 });
             }
 
@@ -362,7 +331,7 @@
             }
 
             recordMovement(e) {
-                if (this.behaviorData.movements.length > 100) return; // 限制数据量
+                if (this.behaviorData.movements.length > 100) return;
                 
                 const now = Date.now();
                 this.behaviorData.movements.push({
@@ -372,6 +341,24 @@
                 });
             }
 
+            getWebGLVendor() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    if (!gl) return 'no_webgl';
+                    
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    if (debugInfo) {
+                        return gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) + 
+                               '|' + 
+                               gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                    }
+                    return 'no_debug_info';
+                } catch (e) {
+                    return 'error';
+                }
+            }
+
             getCanvasFingerprint() {
                 try {
                     const canvas = document.createElement('canvas');
@@ -379,7 +366,6 @@
                     canvas.width = 200;
                     canvas.height = 50;
 
-                    // 绘制一些文本和形状
                     ctx.textBaseline = 'top';
                     ctx.font = '14px Arial';
                     ctx.fillStyle = '#f60';
@@ -387,7 +373,6 @@
                     ctx.fillStyle = '#069';
                     ctx.fillText('Canvas Fingerprint', 60, 15);
 
-                    // 添加复杂形状
                     ctx.strokeStyle = 'rgb(120, 186, 176)';
                     ctx.beginPath();
                     ctx.moveTo(60, 30);
@@ -397,7 +382,6 @@
                     ctx.closePath();
                     ctx.stroke();
 
-                    // 添加渐变
                     const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
                     gradient.addColorStop(0, '#ff0000');
                     gradient.addColorStop(0.5, '#00ff00');
@@ -405,7 +389,7 @@
                     ctx.fillStyle = gradient;
                     ctx.fillRect(130, 0, 70, 50);
 
-                    return canvas.toDataURL().slice(-32); // 取部分数据作为指纹
+                    return canvas.toDataURL().slice(-32);
                 } catch (e) {
                     return 'error';
                 }
@@ -468,17 +452,14 @@
 
             // 验证流程
             startVerification() {
-                // 记录交互开始时间
                 this.behaviorData.interactionTiming.start = Date.now();
                 
-                // 速率限制检查
                 const now = Date.now();
-                if (now - this.lastAttemptTime < 1000) { // 1秒内只能尝试一次
+                if (now - this.lastAttemptTime < 1000) {
                     this.showError("操作过于频繁，请稍后再试");
                     return;
                 }
                 
-                // 失败次数限制
                 if (this.failedAttempts >= 3) {
                     this.showError("验证失败次数过多，请刷新页面重试");
                     this.verifyButton.disabled = true;
@@ -488,102 +469,186 @@
                 this.lastAttemptTime = now;
                 this.showLoading();
                 
-                // 根据失败次数增加延迟
-                const delay = 1000 + (this.failedAttempts * 500);
-                
                 setTimeout(() => {
                     const isSuspicious = this.checkDeviceFingerprint();
                     
                     if (!isSuspicious) {
-                        // 初级验证通过，显示拼图验证
-                        this.initPuzzleChallenge();
+                        this.initChallenge();
                     } else {
                         this.failedAttempts++;
-                        const remainingAttempts = 10 - this.failedAttempts;
-                        this.showError(`验证失败，剩余尝试次数: ${remainingAttempts}`);
+                        const remainingAttempts = 3 - this.failedAttempts;
+                        this.showError(remainingAttempts > 0 
+                            ? `验证失败，剩余尝试次数: ${remainingAttempts}`
+                            : "验证失败次数过多");
                         
-                        // 失败3次后阻止进一步尝试
-                        if (this.failedAttempts >= 10) {
+                        if (this.failedAttempts >= 3) {
                             this.verifyButton.disabled = true;
                         }
                     }
-                }, delay);
+                }, 800);
             }
             
-            // 初始化拼图验证
-            initPuzzleChallenge() {
+            initChallenge() {
                 this.loadingIndicator.style.display = 'none';
                 this.verifyButton.style.display = 'none';
-                this.puzzleChallenge.style.display = 'block';
-                this.verificationMessage.textContent = '请完成拼图验证';
+                this.challengeContainer.style.display = 'block';
                 
-                // 设置随机拼图位置 (60%-90% 范围内)
-                this.puzzleTargetPosition = Math.floor(Math.random() * 30) + 60;
+                this.challengeStep++;
+                this.progressBar.style.width = `${(this.challengeStep / this.maxSteps) * 100}%`;
                 
-                // 设置拼图背景图
-                const puzzleImages = [
-                    'https://cvii.dpdns.org/puzzle1.jpg',
-                    'https://cvii.dpdns.org/puzzle2.jpg',
-                    'https://cvii.dpdns.org/puzzle3.jpg'
+                this.generateImageChallenge();
+            }
+            
+            generateImageChallenge() {
+                this.selectedItems = [];
+                this.challengeGrid.innerHTML = '';
+                
+                const challenges = [
+                    { target: '交通灯', correctCount: 3 },
+                    { target: '自行车', correctCount: 3 },
+                    { target: '消防栓', correctCount: 2 }
                 ];
-                const randomImage = puzzleImages[Math.floor(Math.random() * puzzleImages.length)];
-                this.puzzleImage.style.backgroundImage = `url(${randomImage})`;
                 
-                // 初始化滑块位置
-                const sliderTrack = this.sliderThumb.parentElement;
-                const trackRect = sliderTrack.getBoundingClientRect();
-                this.sliderLeft = trackRect.left;
+                this.currentChallenge = challenges[Math.floor(Math.random() * challenges.length)];
+                this.challengeTarget.textContent = this.currentChallenge.target;
                 
-                // 重置拼图块位置
-                this.puzzlePiece.style.left = `${this.puzzleTargetPosition}%`;
-            }
-            
-            // 开始拖动滑块
-            startDrag(e) {
-                this.isDragging = true;
-                this.startX = e.clientX - this.sliderThumb.getBoundingClientRect().left;
-                this.sliderThumb.style.cursor = 'grabbing';
-            }
-            
-            // 拖动滑块
-            dragSlider(e) {
-                if (!this.isDragging) return;
+                const allImages = this.getChallengeImages(this.currentChallenge.target);
+                const shuffledImages = this.shuffleArray([...allImages.correct, ...allImages.incorrect]);
                 
-                const sliderTrack = this.sliderThumb.parentElement;
-                const trackWidth = sliderTrack.offsetWidth - this.sliderThumb.offsetWidth;
-                let newLeft = e.clientX - this.sliderLeft - this.startX;
-                
-                // 限制滑块范围
-                newLeft = Math.max(0, Math.min(newLeft, trackWidth));
-                
-                // 更新滑块位置
-                this.sliderThumb.style.left = `${newLeft}px`;
-                
-                // 检查是否验证成功 (允许±5px误差)
-                const thumbPosition = (newLeft / trackWidth) * 100;
-                if (Math.abs(thumbPosition - this.puzzleTargetPosition) < 5) {
-                    this.puzzleSuccess.style.display = 'flex';
-                    this.sliderThumb.style.backgroundColor = '#4CAF50';
+                shuffledImages.forEach((img, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'challenge-item';
+                    item.style.backgroundImage = `url(${img.url})`;
+                    item.dataset.correct = img.correct;
+                    item.dataset.index = index;
                     
-                    // 延迟一点时间让用户看到成功效果
-                    setTimeout(() => {
-                        this.passVerification();
-                    }, 500);
+                    item.addEventListener('click', () => this.handleItemClick(item));
+                    this.challengeGrid.appendChild(item);
+                });
+            }
+            
+            getChallengeImages(target) {
+                // 实际应用中应该使用真实图片URL
+                const imageSets = {
+                    '交通灯': {
+                        correct: [
+                            { url: 'https://cvii.dpdns.org/jtd1.jpg', correct: true },
+                            { url: 'https://cvii.dpdns.org/jtd2.jpg', correct: true },
+                            { url: "https://cvii.dpdns.org/jtd3.jpg", correct: true }
+                        ],
+                        incorrect: [
+                            { url: 'https://cvii.dpdns.org/c1.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/c2.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/c3.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/jsp1.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/jsp2.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/jsp3.jpg', correct: false }
+                        ]
+                    },
+                    '自行车': {
+                        correct: [
+                            { url: 'https://cvii.dpdns.org/zxc1.jpg', correct: true },
+                            { url: 'https://cvii.dpdns.org/zxc2.jpg', correct: true },
+                            { url: 'https://cvii.dpdns.org/zxc3.jpg', correct: true }
+                        ],
+                        incorrect: [
+                            { url: 'https://cvii.dpdns.org/tbc1.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/tbc2.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/mtc1.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/mtc2.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/c4.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/c5.jpg', correct: false }
+                        ]
+                    },
+                    '消防栓': {
+                        correct: [
+                            { url: 'https://cvii.dpdns.org/xfs1.jpg', correct: true },
+                            { url: 'https://cvii.dpdns.org/xfs2.jpg', correct: true },
+                            { url: 'https://cvii.dpdns.org/xfs3.jpg', correct: true }
+                        ],
+                        incorrect: [
+                            { url: 'https://cvii.dpdns.org/mtc2.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/gz1.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/gz2.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/gz3.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/slt1.jpg', correct: false },
+                            { url: 'https://cvii.dpdns.org/slt2.jpg', correct: false }
+                        ]
+                    }
+                };
+                
+                return imageSets[target] || imageSets['交通灯'];
+            }
+            
+            handleItemClick(item) {
+                if (item.classList.contains('selected')) {
+                    item.classList.remove('selected');
+                    this.selectedItems = this.selectedItems.filter(i => i !== item.dataset.index);
+                    return;
+                }
+                
+                item.classList.add('selected');
+                this.selectedItems.push(item.dataset.index);
+                
+                if (this.selectedItems.length >= this.currentChallenge.correctCount) {
+                    this.validateChallenge();
                 }
             }
             
-            // 结束拖动
-            endDrag() {
-                this.isDragging = false;
-                this.sliderThumb.style.cursor = 'grab';
-                this.puzzleSuccess.style.display = 'none';
-                this.sliderThumb.style.backgroundColor = '#f38020';
+            validateChallenge() {
+                // 标记所有项目是否正确
+                const items = Array.from(this.challengeGrid.children);
+                let correctSelections = 0;
+                let incorrectSelections = 0;
+                
+                items.forEach(item => {
+                    if (this.selectedItems.includes(item.dataset.index)) {
+                        if (item.dataset.correct === 'true') {
+                            item.classList.add('correct');
+                            correctSelections++;
+                        } else {
+                            item.classList.add('incorrect');
+                            incorrectSelections++;
+                        }
+                    } else if (item.dataset.correct === 'true') {
+                        item.classList.add('incorrect'); // 未选择的正确项目
+                    }
+                });
+                
+                // 验证结果
+                const isSuccess = incorrectSelections === 0 && 
+                                 correctSelections === this.currentChallenge.correctCount;
+                
+                setTimeout(() => {
+                    if (isSuccess) {
+                        if (this.challengeStep >= this.maxSteps) {
+                            this.passVerification();
+                        } else {
+                            this.initChallenge();
+                        }
+                    } else {
+                        this.failedAttempts++;
+                        if (this.failedAttempts >= 3) {
+                            this.showError("验证失败次数过多");
+                            this.verifyButton.disabled = true;
+                        } else {
+                            this.showError("选择不正确，请重试");
+                            setTimeout(() => this.generateImageChallenge(), 1000);
+                        }
+                    }
+                }, 800);
+            }
+            
+            shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
             }
 
-            // 检查设备指纹
             checkDeviceFingerprint() {
-                const ua = this.behaviorData.deviceInfo.userAgent.toLowerCase();
-                const perf = window.performance;
+                const ua = this.behaviorData.deviceInfo.userAgent;
                 
                 // 1. 检查Headless浏览器
                 const headlessIndicators = [
@@ -591,14 +656,13 @@
                     'crawler', 'spider', 'bot', 'automation'
                 ];
                 
-                if (headlessIndicators.some(ind => ua.includes(ind))) {
+                if (headlessIndicators.some(ind => ua.toLowerCase().includes(ind))) {
                     return true;
                 }
                 
                 // 2. 检查WebGL支持
                 if (!this.behaviorData.deviceInfo.webglVendor || 
-                    this.behaviorData.deviceInfo.webglVendor === 'error' ||
-                    this.behaviorData.deviceInfo.webglVendor === 'no_debug_info') {
+                    this.behaviorData.deviceInfo.webglVendor.includes('no_')) {
                     return true;
                 }
                 
@@ -618,43 +682,19 @@
                     return true;
                 }
                 
-                // 6. 检查CPU核心数异常
-                const cores = this.behaviorData.deviceInfo.hardwareConcurrency;
-                if (cores === 1 || cores > 16) {
-                    return true;
-                }
-                
-                // 7. 检查内存异常
-                const memory = this.behaviorData.deviceInfo.deviceMemory;
-                if (memory < 1 || memory > 16) {
-                    return true;
-                }
-                
-                // 8. 检查触摸支持与设备类型是否匹配
-                const hasTouch = this.behaviorData.deviceInfo.touchSupport;
-                if (this.isMobile && !hasTouch) {
-                    return true;
-                }
-                
-                // 9. 检查行为模式
+                // 6. 检查行为模式
                 if (this.behaviorData.taps.length < 3) {
-                    return true;
-                }
-                
-                // 10. 检查字体指纹
-                if (this.behaviorData.deviceInfo.fontFingerprint.length < 5) {
                     return true;
                 }
                 
                 return false;
             }
 
-            // UI 控制方法
             showLoading() {
                 this.verifyButton.disabled = true;
                 this.loadingIndicator.style.display = 'block';
                 this.errorMessage.style.display = 'none';
-                this.puzzleChallenge.style.display = 'none';
+                this.challengeContainer.style.display = 'none';
             }
 
             showError(message) {
@@ -662,11 +702,11 @@
                 this.loadingIndicator.style.display = 'none';
                 this.errorMessage.textContent = message;
                 this.errorMessage.style.display = 'block';
-                this.puzzleChallenge.style.display = 'none';
+                this.challengeContainer.style.display = 'none';
+                this.verifyButton.style.display = 'block';
             }
 
             passVerification() {
-                // 记录交互结束时间
                 this.behaviorData.interactionTiming.end = Date.now();
                 this.behaviorData.interactionTiming.duration = 
                     this.behaviorData.interactionTiming.end - this.behaviorData.interactionTiming.start;
@@ -675,12 +715,10 @@
                 this.loadingIndicator.style.display = 'none';
                 this.successMessage.style.display = 'block';
                 this.verifyButton.style.display = 'none';
-                this.puzzleChallenge.style.display = 'none';
+                this.challengeContainer.style.display = 'none';
 
-                // 生成验证token
                 const token = this.generateVerificationToken();
                 
-                // 发送消息给父窗口
                 window.parent.postMessage(
                     { 
                         type: 'turnstileVerified', 
@@ -688,10 +726,9 @@
                         token: token,
                         timestamp: Date.now()
                     },
-                    '*' // 父窗口不确定
+                    '*'
                 );
 
-                // 2秒后关闭验证（可选）
                 setTimeout(() => {
                     const event = new CustomEvent('turnstileVerified', {
                         detail: { success: true }
@@ -700,9 +737,7 @@
                 }, 2000);
             }
             
-            // 生成验证token
             generateVerificationToken() {
-                // 简单示例 - 实际应用中应该使用更安全的算法
                 const timestamp = Date.now();
                 const randomStr = Math.random().toString(36).substring(2, 15);
                 const fingerprintHash = this.hashString(JSON.stringify(this.behaviorData.deviceInfo));
@@ -710,18 +745,16 @@
                 return `${timestamp}-${randomStr}-${fingerprintHash.slice(0, 8)}`;
             }
             
-            // 简单的字符串哈希函数
             hashString(str) {
                 let hash = 0;
                 for (let i = 0; i < str.length; i++) {
                     const char = str.charCodeAt(i);
                     hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash; // Convert to 32bit integer
+                    hash = hash & hash;
                 }
                 return hash.toString(16);
             }
 
-            // 公开方法
             getVerificationStatus() {
                 return {
                     verified: this.verificationPassed,
@@ -730,11 +763,8 @@
             }
         }
 
-        // 初始化验证
         document.addEventListener('DOMContentLoaded', () => {
             const turnstile = new TurnstileVerification();
-
-            // 暴露API供外部调用
             window.Turnstile = {
                 getStatus: () => turnstile.getVerificationStatus()
             };

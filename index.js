@@ -5,7 +5,8 @@
             '*'
         ],
         iframeSrc: 'https://cvii.dpdns.org/turnstile.html',
-        verificationTimeout: 300000 // 5分钟验证超时
+        verificationTimeout: 300000, // 5分钟验证超时
+        tokenExpiry: 3600000 // 1小时token有效期
     };
     
     // 创建遮罩层
@@ -35,7 +36,7 @@
     iframe.src = config.iframeSrc;
     iframe.style.border = 'none';
     iframe.style.width = '320px';
-    iframe.style.height = '550px';
+    iframe.style.height = '400px';
     iframe.style.borderRadius = '8px';
     iframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
     
@@ -69,9 +70,40 @@
         clearTimeout(verificationTimer);
     }
     
+    // 检查token是否有效
+    function isValidToken(token, expiry) {
+        if (!token || !expiry) return false;
+        
+        const now = Date.now();
+        const expiryTime = parseInt(expiry);
+        
+        // 检查token是否过期（提前5分钟视为即将过期）
+        return now < (expiryTime - 300000);
+    }
+    
+    // 清除过期token
+    function clearExpiredToken() {
+        const token = localStorage.getItem('turnstile_token');
+        const expiry = localStorage.getItem('turnstile_token_expiry');
+        
+        if (token && expiry && !isValidToken(token, expiry)) {
+            localStorage.removeItem('turnstile_token');
+            localStorage.removeItem('turnstile_token_expiry');
+        }
+    }
+    
+    // 检查是否有有效token
+    function checkExistingToken() {
+        clearExpiredToken(); // 先清理过期token
+        
+        const token = localStorage.getItem('turnstile_token');
+        const expiry = localStorage.getItem('turnstile_token_expiry');
+        
+        return isValidToken(token, expiry);
+    }
+    
     // 严格的消息监听
     window.addEventListener('message', function(e) {
-        
         // 验证消息结构
         if (e.data && typeof e.data === 'object' && 
             e.data.type === 'turnstileVerified' && 
@@ -81,25 +113,14 @@
                 isVerified = true;
                 hideTurnstile();
                 
-                // 存储验证token
+                // 存储验证token和过期时间
                 if (e.data.token) {
                     localStorage.setItem('turnstile_token', e.data.token);
-                    localStorage.setItem('turnstile_token_expiry', Date.now() + 3600000); // 1小时有效
+                    localStorage.setItem('turnstile_token_expiry', Date.now() + config.tokenExpiry);
                 }
             }
         }
     });
-    
-    // 检查是否有有效token
-    function checkExistingToken() {
-        const token = localStorage.getItem('turnstile_token');
-        const expiry = localStorage.getItem('turnstile_token_expiry');
-        
-        if (token && expiry && Date.now() < parseInt(expiry)) {
-            return true;
-        }
-        return false;
-    }
     
     // 初始化
     if (!checkExistingToken()) {
@@ -114,7 +135,16 @@
             return isVerified || checkExistingToken();
         },
         getToken: function() {
-            return localStorage.getItem('turnstile_token');
+            // 返回token前检查有效性
+            return checkExistingToken() ? localStorage.getItem('turnstile_token') : null;
+        },
+        clearToken: function() {
+            localStorage.removeItem('turnstile_token');
+            localStorage.removeItem('turnstile_token_expiry');
+            isVerified = false;
+        },
+        getTokenExpiry: function() {
+            return localStorage.getItem('turnstile_token_expiry');
         }
     };
 })();
