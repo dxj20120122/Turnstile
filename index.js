@@ -2,9 +2,9 @@
     // 配置
     const config = {
         allowedOrigins: [
-            '*' // 允许所有来源
+            '*'
         ],
-        iframeSrc: './turnstile.html', // 使用相对路径
+        iframeSrc: 'https://cvii.dpdns.org/turnstile.html',
         verificationTimeout: 300000 // 5分钟验证超时
     };
     
@@ -30,15 +30,15 @@
     container.style.zIndex = '9999';
     container.style.display = 'none';
     
-    // 创建iframe - 修改部分
+    // 创建iframe
     const iframe = document.createElement('iframe');
     iframe.src = config.iframeSrc;
     iframe.style.border = 'none';
     iframe.style.width = '320px';
     iframe.style.height = '550px';
     iframe.style.borderRadius = '8px';
-    iframe.allow = 'accelerometer; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; xr-spatial-tracking';
-    iframe.sandbox = 'allow-scripts allow-forms';
+    iframe.allow = 'accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking';
+    iframe.sandbox = 'allow-scripts allow-same-origin allow-forms';
     
     container.appendChild(iframe);
     document.body.appendChild(container);
@@ -72,6 +72,11 @@
     
     // 严格的消息监听
     window.addEventListener('message', function(e) {
+        // 验证消息来源
+        if (!config.allowedOrigins.includes(e.origin)) {
+            console.warn('收到来自未授权域的消息:', e.origin);
+            return;
+        }
         
         // 验证消息结构
         if (e.data && typeof e.data === 'object' && 
