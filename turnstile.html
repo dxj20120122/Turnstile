@@ -275,7 +275,6 @@
 
                 this.initElements();
                 this.setupEventListeners();
-                this.collectDeviceFingerprint();
                 
                 // 拼图验证相关
                 this.puzzleTargetPosition = 0;
@@ -376,63 +375,6 @@
                     y: e.clientY,
                     time: now
                 });
-            }
-
-            // 设备指纹收集
-            collectDeviceFingerprint() {
-                this.behaviorData.deviceInfo = {
-                    // 基础信息
-                    userAgent: navigator.userAgent,
-                    platform: navigator.platform,
-                    // 硬件信息
-                    hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
-                    deviceMemory: navigator.deviceMemory || 'unknown',
-                    // 屏幕信息
-                    screenResolution: `${window.screen.width}x${window.screen.height}`,
-                    colorDepth: window.screen.colorDepth,
-                    // 系统信息
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    languages: navigator.languages,
-                    // 隐私设置
-                    cookieEnabled: navigator.cookieEnabled,
-                    doNotTrack: navigator.doNotTrack || 'unspecified',
-                    // 高级指纹
-                    webglVendor: this.getWebGLInfo(),
-                    canvasFingerprint: this.getCanvasFingerprint(),
-                    audioContextFingerprint: this.getAudioFingerprint(),
-                    fontFingerprint: this.getFontFingerprint(),
-                    touchSupport: 'ontouchstart' in window,
-                    // 性能指标
-                    performanceTiming: window.performance ? {
-                        timing: window.performance.timing ? 
-                            Object.assign({}, window.performance.timing) : null,
-                        memory: window.performance.memory
-                    } : null
-                };
-            }
-
-            getWebGLInfo() {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                    if (!gl) return 'unsupported';
-
-                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                    if (!debugInfo) return 'no_debug_info';
-
-                    return {
-                        vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
-                        renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL),
-                        parameters: {
-                            MAX_TEXTURE_SIZE: gl.getParameter(gl.MAX_TEXTURE_SIZE),
-                            MAX_RENDERBUFFER_SIZE: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
-                            UNMASKED_VENDOR_WEBGL: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
-                            UNMASKED_RENDERER_WEBGL: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
-                        }
-                    };
-                } catch (e) {
-                    return 'error';
-                }
             }
 
             getCanvasFingerprint() {
@@ -536,7 +478,7 @@
                 
                 // 速率限制检查
                 const now = Date.now();
-                if (now - this.lastAttemptTime < 1000) { // 2秒内只能尝试一次
+                if (now - this.lastAttemptTime < 1000) { // 1秒内只能尝试一次
                     this.showError("操作过于频繁，请稍后再试");
                     return;
                 }
